@@ -1,0 +1,197 @@
+---
+title: "STA 135 Final"
+output: html_document
+date: "2024-06-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Loading Data and Libraries
+```{r}
+library(mlbench)
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(kableExtra)
+library(GGally)
+library(klaR)
+library(psych)
+library(MASS)
+library(devtools)
+library(ade4)
+
+data(Glass)
+```
+
+
+```{r}
+library(mvtnorm)
+library(klaR)
+library(psych)
+library(MASS)
+library(devtools)
+library(ade4)
+library(ggplot2)
+
+# Visualize pair panels
+pairs.panels(Glass[, -10],
+             gap = 0,
+             bg = c("red", "green", "blue", "yellow", "purple", "orange", "brown")[Glass$Type],
+             pch = 21)
+
+# Split the data into training and testing sets
+set.seed(123)
+ind <- sample(2, nrow(Glass), replace = TRUE, prob = c(0.6, 0.4))
+training <- Glass[ind == 1, ]
+testing <- Glass[ind == 2, ]
+
+# Perform LDA
+lda_model <- lda(Type ~ ., data = training)
+print(lda_model)
+
+# Adjust the margins and layout for plotting
+par(mar = c(5, 4, 4, 2) + 0.1)  # Increase the margin size
+par(mfrow = c(1, 1))  # Set layout to single plot
+
+# Open a new plotting device with specified dimensions
+dev.new(width = 12, height = 8)
+
+# Visualize LDA decision boundaries
+#partimat(Type ~ ., data = training, method = "lda")
+
+# Predictions on training data
+p1 <- predict(lda_model, training)$class
+tab <- table(Predicted = p1, Actual = training$Type)
+print(tab)
+
+# Predictions on testing data
+p2 <- predict(lda_model, testing)$class
+tab1 <- table(Predicted = p2, Actual = testing$Type)
+print(tab1)
+
+# Accuracy on testing data
+accuracy <- sum(diag(tab1)) / sum(tab1)
+print(accuracy)
+
+# Perform PCA
+glass_scaled <- scale(Glass[, -10])  # Exclude the target variable
+pca <- prcomp(glass_scaled, center = TRUE, scale. = TRUE)
+summary(pca)
+
+# Plot PCA results
+pca_df <- data.frame(pca$x, Type = Glass$Type)
+ggplot(pca_df, aes(x = PC1, y = PC2, color = as.factor(Type))) +
+  geom_point() +
+  labs(title = "PCA of Glass Identification Data",
+       x = "Principal Component 1",
+       y = "Principal Component 2")
+
+# Eigenvalues and explained variance
+ev <- eigen(cov(glass_scaled))$values
+eve <- eigen(cov(glass_scaled))$vectors
+
+# Plot cumulative contribution ratio
+Cr <- cumsum(ev) / sum(ev)
+plot(Cr, xlab = "Number of Components", ylab = "Cumulative Contribution Ratio", pch = 19, col = "blue")
+abline(h = 0.8, col = "red")
+
+# Plot eigenvalues
+plot(ev, xlab = "Number of Components", ylab = "Eigenvalues", pch = 19, col = "blue")
+abline(h = mean(ev), col = "red")
+
+# Scree plot
+plot(ev, xlab = "Number of Components", ylab = "Eigenvalues", pch = 19, col = "blue")
+
+# Plot differences between successive eigenvalues
+plot(ev[1:8] - ev[2:9], xlab = "Number", ylab = "Difference in Eigenvalues", pch = 19, col = "blue")
+
+# Hypothesis testing for number of components to retain
+u <- rep(0, 8)
+for (k in 1:8) {
+  intermediate <- 1 / (9 - k + 1) * sum(ev[k:9])
+  u[k] <- (nrow(glass_scaled) - (2 * 9 + 11) / 6) * ((9 - k + 1) * log(intermediate) - sum(log(ev[k:9])))
+}
+
+
+```
+
+
+```{r}
+loadings <- pca$rotation[, 1:4]
+
+# Create a dataframe for the loadings
+loadings_df <- as.data.frame(loadings)
+colnames(loadings_df) <- c("PC1", "PC2", "PC3", "PC4")
+
+# Add the variable names as a column
+loadings_df$Variable <- rownames(loadings_df)
+
+# Reorder the columns
+loadings_df <- loadings_df[, c("Variable", "PC1", "PC2", "PC3", "PC4")]
+
+# Create a nicely formatted table
+kable(loadings_df, format = "html", table.attr = "class='table table-striped'") %>%
+  kable_styling(full_width = FALSE, position = "center", bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>%
+  column_spec(1, bold = TRUE) %>%
+  row_spec(0, bold = TRUE)
+```
+
+```{r}
+pca_scores <- data.frame(pca$x[, 1:4], Type = Glass$Type)
+colnames(pca_scores) <- c("PC1", "PC2", "PC3", "PC4", "Type")
+
+# Split the PCA scores data into training and testing sets
+set.seed(999)
+ind <- sample(2, nrow(pca_scores), replace = TRUE, prob = c(0.6, 0.4))
+training_pca <- pca_scores[ind == 1, ]
+testing_pca <- pca_scores[ind == 2, ]
+
+# Perform LDA using the first four PCs
+lda_model_pca <- lda(Type ~ PC1 + PC2 + PC3 + PC4, data = training_pca)
+print(lda_model_pca)
+
+# Predictions on training data
+p1_pca <- predict(lda_model_pca, training_pca)$class
+tab_pca <- table(Predicted = p1_pca, Actual = training_pca$Type)
+print("Confusion Matrix for Training Data:")
+print(tab_pca)
+
+# Predictions on testing data
+p2_pca <- predict(lda_model_pca, testing_pca)$class
+tab1_pca <- table(Predicted = p2_pca, Actual = testing_pca$Type)
+print("Confusion Matrix for Testing Data:")
+print(tab1_pca)
+
+# Calculate accuracy for testing data
+accuracy_pca <- sum(diag(tab1_pca)) / sum(tab1_pca)
+print(paste("Accuracy on Testing Data:", accuracy_pca))
+
+# Visualize the LDA results
+lda_scores <- predict(lda_model_pca, pca_scores)$x
+lda_df <- data.frame(lda_scores, Type = pca_scores$Type)
+
+# Scatter plot of the first two linear discriminants
+ggplot(lda_df, aes(x = LD1, y = LD2, color = as.factor(Type))) +
+  geom_point() +
+  labs(title = "LDA of Glass Identification Data using PCA",
+       x = "Linear Discriminant 1",
+       y = "Linear Discriminant 2")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
