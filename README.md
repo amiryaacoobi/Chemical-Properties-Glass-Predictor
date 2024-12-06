@@ -1,0 +1,1 @@
+ This project aims to predict glass types based on their chemical properties, aiding forensic investigations. Utilizing the Glass Identification dataset, the analysis applies multivariate techniques, including principal component analysis and linear discriminant analysis, to classify glass types effectively.
